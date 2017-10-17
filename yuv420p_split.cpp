@@ -6,6 +6,7 @@ typedef int BOOL;
 #define TRUE  1
 #define FALSE 0
 
+//分离YUV420P像素数据中的Y、U、V分量
 BOOL yuv420p_split(const char *file, int width, int height)
 {
     if (file == NULL) {
@@ -30,6 +31,7 @@ BOOL yuv420p_split(const char *file, int width, int height)
     
     free(data);
     fclose(fp);
+    fclose(fp0);
     fclose(fp1);
     fclose(fp2);
     fclose(fp3);

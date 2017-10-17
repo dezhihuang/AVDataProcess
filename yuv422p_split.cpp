@@ -6,6 +6,7 @@ typedef int BOOL;
 #define TRUE  1
 #define FALSE 0
 
+//分离YUV422P像素数据中的Y、U、V分量（还有问题，图像显示不完整）
 BOOL yuv422p_split(const char *file, int width, int height)
 {
     if (file == NULL) {
@@ -30,6 +31,7 @@ BOOL yuv422p_split(const char *file, int width, int height)
     
     free(data);
     fclose(fp);
+    fclose(fp0);
     fclose(fp1);
     fclose(fp2);
     fclose(fp3);

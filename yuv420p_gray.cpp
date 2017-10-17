@@ -6,6 +6,7 @@ typedef int BOOL;
 #define TRUE  1
 #define FALSE 0
 
+//将YUV420P像素数据去掉颜色（变成灰度图）
 BOOL yuv420p_gray(const char *file, int width, int height)
 {
     if (file == NULL) {
