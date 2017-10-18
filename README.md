@@ -22,6 +22,9 @@ yuv播放器：[修改了一个YUV/RGB播放器](http://blog.csdn.net/leixiaohua
 ## 分离YUV420P像素数据中的Y、U、V分量
 > 如果视频帧的宽和高分别为w和h，那么一帧YUV420P像素数据一共占用w*h*3/2 Byte的数据。其中前w * h Byte存储Y，接着的w * h * 1/4 Byte存储U，最后w * h * 1/4 Byte存储V。
 
+yuv420p像素数据排列如下图。原图像分辨率为256 * 256，所以Y分量分辨率为256 * 256，U分量分辨率为128 * 128，V分量分辨率为128 * 128： 
+
+![](./images/yuv420p_data.png)
 
 yuv420_split.cpp 程序中的函数可以将YUV420P数据中的Y、U、V三个分量分离开来并保存成三个文件。
 
