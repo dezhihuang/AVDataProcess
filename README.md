@@ -267,6 +267,23 @@ BMP采用的是小端（Little Endian）存储方式。这种存储方式中“R
 
 
 
+## 生成RGB24格式的彩条测试图
+
+> rgb24_colorbar.cpp程序输出“红橙黄绿青蓝紫白黑”9种颜色的彩条。
+
+输出结果如图所示：
+![](./images/colorbar_640x480.png)
+
+
+
+
+
+
+
+<br />
+<br />
+
+
 
 参考：[视音频数据处理入门：RGB、YUV像素数据处理](http://blog.csdn.net/leixiaohua1020/article/details/50534150)
 ![](./images/leixiaohua_avDataProcess.png)
