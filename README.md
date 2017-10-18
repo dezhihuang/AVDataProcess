@@ -174,6 +174,73 @@ B数据图像如图所示： ![](./images/cie1931_500x500_b.png)
 
 
 
+## 将RGB24格式像素数据封装为BMP图像
+>说明：BMP图像内部实际上存储的就是RGB数据。本程序实现了对RGB像素数据的封装处理。通过本程序中的函数，可以将RGB数据封装成为一张BMP图像。
+
+
+调用方法：
+>./rgb24_to_bmp ./mediadata/lena_256x256_rgb24.rgb 256 256
+
+
+该程序完成了主要完成了两个工作：
+
+- 将RGB数据前面加上文件头。
+- 将RGB数据中每个像素的“B”和“R”的位置互换。
+
+BMP文件是由BITMAPFILEHEADER、BITMAPINFOHEADER、RGB像素数据共3个部分构成
+
+	//位图文件头结构体
+	//这个结构体的长度是固定的14个字节。
+	//考虑到结构体的字节对齐，将bfType单独提取出来，否则会造成该结构体为16个字节。
+	static unsigned short bfType = 0x4D42;//指定文件类型，必须是0x424D，
+	                                      //即字符串“BM”，也就是说所有.bmp文件的头两个字节都是“BM”。
+	                                      //'BM'表示这是Windows支持的位图格式。
+	typedef struct {
+	    unsigned int bfSize;         //指定文件大小，以字节为单位，包括这14个字节。
+	    unsigned short bfReserved1;  //为保留字，不用考虑
+	    unsigned short bfReserved2;  //为保留字，不用考虑
+	    unsigned int bfOffBits;      //位图文件头到数据的偏移量，以字节为单位  
+	}BITMAPFILEHEADER;
+
+	
+	//位图信息头结构体
+	typedef struct {
+	    unsigned int biSize;          //该结构大小，字节为单位，一般为40个字节 
+	    unsigned int biWidth;         //指定图象的宽度，单位是象素。
+	    unsigned int biHeight;        //指定图象的高度，单位是象素。
+	                                  //注：这个值除了用于描述图像的高度之外，它还有另一个用处，
+	                                  //就是指明该图像是倒向的位图，还是正向的位图。
+	                                  //如果该值是一个正数，说明图像是倒向的，如果该值是个负数，则说明图像是正向的。
+	                                  //大多数的BMP文件都是倒向的位图，也就是高度值是一个正数。
+	    unsigned short biPlanes;      //为目标设备说明颜色平面数，必须为1，不用考虑
+	    unsigned short biBitCount;    //颜色深度，每个象素所需要的位数
+	    unsigned int biCompression;   //位图的压缩类型 
+	    unsigned int biSizeImage;     //位图的大小，以字节为单位
+	    unsigned int biXPelsPerMeter; //位图水平分辨率，每米像素数
+	    unsigned int biYPelsPerMeter; //位图垂直分辨率，每米像素数  
+	    unsigned int biClrUsed;       //位图实际使用的颜色表中的颜色数  
+	    unsigned int biClrImportant;  //位图显示过程中重要的颜色数  
+	}BITMAPINFOHEADER;
+
+
+BMP采用的是小端（Little Endian）存储方式。这种存储方式中“RGB24”格式的像素的分量存储的先后顺序为B、G、R。由于RGB24格式存储的顺序是R、G、B，所以需要将“R”和“B”顺序作一个调换再进行存储。
+
+> 注意：vs中结构体默认是1个字节对齐，即为8的倍数。gcc中结构体默认是4个字节对齐，即为32的倍数。
+
+
+
+
+
+
+<br />
+<br />
+
+
+
+
+
+
+
 
 参考：[视音频数据处理入门：RGB、YUV像素数据处理](http://blog.csdn.net/leixiaohua1020/article/details/50534150)
 ![](./images/leixiaohua_avDataProcess.png)
