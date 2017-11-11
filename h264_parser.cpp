@@ -1,3 +1,6 @@
+/*该程序可以从H.264码流中分析得到它的基本单元NALU，并且可以简单解析NALU首部的字段。通过修改该程序可以实现不同的H.264码流处理功能*/
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,8 +46,8 @@ typedef struct
     char *buf;             //! contains the first byte followed by the EBSP  
 } NALU_t;  
 
-//如果NALU对应的Slice为一帧的开始就用0x00000001，否则就用0x000001。
-int findStartCode2(unsigned char *buf)
+//如果NALU对应的Slice为一帧的开始就用0x00000001（四个字节），否则就用0x000001（三个字节）。
+int findStartCode3(unsigned char *buf)
 {
     if ( buf[0]!=0 || buf[1]!=0 || buf[2]!=1 ) {
         return 0; //0x000001
@@ -52,7 +55,7 @@ int findStartCode2(unsigned char *buf)
         return 1;
     }
 }
-int findStartCode3(unsigned char *buf)
+int findStartCode4(unsigned char *buf)
 {
     if ( buf[0]!=0 || buf[1]!=0 || buf[2]!=0 || buf[3]!=1 ) {
         return 0; //0x00000001
@@ -60,7 +63,7 @@ int findStartCode3(unsigned char *buf)
         return 1;
     }
 }
-//如果NALU对应的Slice为一帧的开始就用0x00000001(即3个字节长度)，否则就用0x000001(即4个字节长度)。
+//如果NALU对应的Slice为一帧的开始就用0x00000001(即4个字节长度)，否则就用0x000001(即3个字节长度)。
 int findStartCode(const unsigned char *buf)
 {
     if (strlen((const char*)buf) >= 3) {
@@ -76,6 +79,8 @@ int findStartCode(const unsigned char *buf)
     return 0;
 }
 
+
+//获取NALU单元
 int getNalu(NALU_t *nalu, FILE *fp)
 {
     if (nalu == NULL) {
@@ -89,25 +94,31 @@ int getNalu(NALU_t *nalu, FILE *fp)
         memset(buf, 0, nalu->max_size);
     }
     
+    //默认起始码长度为3个字节
     nalu->startcode_len = 3;
     
     //读取前三个字节以判断NALU的起始标志
+    //如果fread返回值不等于3，则表示已到文件结尾
     if (3 != fread(buf, 1, 3, fp)) {
         free(buf);
         return 0;
     }
     
     //获取起始码长度
-    int info3 = 0;
-    int pos = 0;
-    int info2 = findStartCode2(buf);
-    if (info2 != 1) {
+    int info4 = 0; //4个字节长度的起始码，一帧的开始
+    int info3 = 0; //3个字节长度的起始码
+    int pos = 0;   //当前位置
+    
+    //首先查找3字节的起始码
+    info3 = findStartCode3(buf);
+    if (info3 != 1) {
+        //如果不是3字节长度的起始码，就再读取一个字节以判断是否为4字节长度的起始码
         if (1 != fread(buf+3, 1, 1, fp)) {
             free(buf);
             return 0;
         }
-        info3 = findStartCode3(buf);
-        if (info3 != 1) {
+        info4 = findStartCode4(buf);
+        if (info4 != 1) {
             free(buf);
             return -1;
         } else {
@@ -120,45 +131,68 @@ int getNalu(NALU_t *nalu, FILE *fp)
     }
     
     while (1) {
-        if (feof(fp)) { //文件结束
+        //如果文件结束
+        if (feof(fp)) { 
             nalu->len = (pos-1) - nalu->startcode_len;
             memcpy(nalu->buf, &buf[nalu->startcode_len], nalu->len);
             
-            nalu->forbidden_bit = nalu->buf[0] & 0x80; //1 bit
+            nalu->forbidden_bit     = nalu->buf[0] & 0x80; //1 bit
             nalu->nal_reference_idc = nalu->buf[0] & 0x60; //2 bit
-            nalu->nalu_type = nalu->buf[0] & 0x1f; //5 bit
+            nalu->nalu_type         = nalu->buf[0] & 0x1f; //5 bit
+            
             free(buf);
+          
             return pos-1;
         }
         
+        //循环读取一个字符，为了查找下一个起始码的位置
         buf[pos++] = fgetc(fp);
-        info3 = findStartCode3(&buf[pos-4]);
-        if (info3 != 1) {
-            info2 = findStartCode2(&buf[pos-3]);
+        
+        //首先查找4字节的起始码
+        info4 = findStartCode4(&buf[pos-4]);
+        if (info4 != 1) {
+            //如果不是4字节的起始码，再判断是否是3字节的起始码
+            info3 = findStartCode3(&buf[pos-3]);
         }
 
-        if (info2==1 || info3==1) {
+        //如果查找到了起始码就退出
+        if (info3==1 || info4==1) {
             break;
         }
     }
     
-    int rewind = (info3==1) ? -4 : -3;
+    //程序能走到这一步表示查找到起始码
+    //文件指针往回走3/4个字节，即起始码字节长度
+    int rewind = (info4==1) ? -4 : -3;
     if (0 != fseek(fp, rewind, SEEK_CUR)) {
         free(buf);
     }
     
+    //NALU长度不包括起始码长度
+    //当前位置减去下一个起始码长度，再减去当前起始码长度
     nalu->len = (pos+rewind) - nalu->startcode_len;
+    
+    //NALU内容不包括起始码
     memcpy(nalu->buf, &buf[nalu->startcode_len], nalu->len);
-    nalu->forbidden_bit     = nalu->buf[0] & 0x80; //1 bit
-    nalu->nal_reference_idc = nalu->buf[0] & 0x60; //2 bit
-    nalu->nalu_type         = nalu->buf[0] & 0x1f; //5 bit
+    
+    nalu->forbidden_bit     = nalu->buf[0] & 0x80; //1000 0000，禁止位(1bit)
+    nalu->nal_reference_idc = nalu->buf[0] & 0x60; //0110 0000，重要性指示位(2bit)
+    nalu->nalu_type         = nalu->buf[0] & 0x1f; //0001 1111，NALU类型(5bit)
+   
     free(buf);
+    
+    //返回NALU长度(包括起始码长度)
     return pos+rewind;
 }
 
 
 int h264_parser(char *file)
 {
+    if (file == NULL) {
+        return 0;
+    }
+    
+    //从文件中读取h264码流
     FILE *h264BitStream = fopen(file, "rb+");
     if (h264BitStream == NULL) {
         return 0;
@@ -178,15 +212,18 @@ int h264_parser(char *file)
     } else {
         memset(nalu->buf, 0, 100000);
     }
-    
-    int data_offset=0;  
-    int nal_num=0;  
+      
     printf("-----+-------- NALU Table ------+---------+\n");  
     printf(" NUM |    POS  |    IDC |  TYPE |   LEN   |\n");  
     printf("-----+---------+--------+-------+---------+\n");  
     
+    int data_offset=0;  
+    int nal_num=0;      //NALU计数
+    
     while(!feof(h264BitStream)) {
+        //分析一个NALU，返回NALU长度(包括起始码长度)
         int dataLen = getNalu(nalu, h264BitStream);
+        
         char sType[20] = {0};
         switch(nalu->nalu_type) {
             case NALU_TYPE_SLICE:    sprintf(sType, "SLICE");    break;
@@ -204,18 +241,22 @@ int h264_parser(char *file)
         }
         char idc_str[20] = {0};
         switch(nalu->nal_reference_idc >> 5) {
-            case NALU_PRIORITY_DISPOSABLE:sprintf(idc_str,"DISPOS");break;  
-            case NALU_PRIORITY_LOW:sprintf(idc_str,"LOW");break;  
-            case NALU_PRIORITY_HIGH:sprintf(idc_str,"HIGH");break;  
-            case NALU_PRIORITY_HIGHEST:sprintf(idc_str,"HIGHEST");break;  
+            case NALU_PRIORITY_DISPOSABLE:sprintf(idc_str,"DISPOS"); break;  
+            case NALU_PRIORITY_LOW:       sprintf(idc_str,"LOW");    break;  
+            case NALU_PRIORITY_HIGH:      sprintf(idc_str,"HIGH");   break;  
+            case NALU_PRIORITY_HIGHEST:   sprintf(idc_str,"HIGHEST");break;  
         }
         FILE *out = stdout;
         fprintf(out,"%5d| %8d| %7s| %6s| %8d|\n",nal_num,data_offset,idc_str,sType,nalu->len);  
         
+        //NAL单元计数
         nal_num++;
         
+        //数据偏移，也就是下一个NALU起始位置(起始码的位置)
         data_offset = data_offset + dataLen;
     }
+    
+    //释放内存
     if (nalu) {
         if (nalu->buf) {
             free(nalu->buf);
