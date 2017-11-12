@@ -468,5 +468,84 @@ int main()
 <br />
 
 
+## 将PCM16LE双声道音频采样数据的声音速度提高一倍
+> 注：本文中声音样值的采样频率一律是44100Hz，采样格式一律为16LE。“16”代表采样位数是16bit。由于1Byte=8bit，所以一个声道的一个采样值占用2Byte。“LE”代表Little Endian，代表2 Byte采样值的存储方式为高位存在高地址中。
+
+``` C++
+//
+//本程序中的函数可以通过抽象的方式将PCM16LE双声道数据的速度提高一倍。
+//
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int pcm16le_doublespeed(const char *file)
+{
+    if (file == NULL) {
+        printf("原始PCM文件为空！\n");
+        return 0;
+    }
+    
+    FILE *fp = fopen(file, "rb+");
+    if (fp == NULL) {
+        printf("原始PCM文件打开失败！\n");
+        return 0;
+    }
+    
+    FILE *fp1 = fopen("./output/output_doublespeed.pcm", "wb+");
+    if (fp1 == NULL) {
+        printf("文件打开或创建失败！\n");
+        return 0;
+    }
+    
+    int count = 0; //采样计数
+    unsigned char buf[4] = {0};
+    
+    while( !feof(fp) ) {
+        //从文件中读取一次采样值，因为是16位的，所以需读取4个字节
+        //左右声道采样值间隔存储
+        //前两个字节为左声道采样值，后两个字节为右声道采样值
+        fread(buf, 1, 4, fp);
+        
+        //只把偶数次采样值写入文件
+        if (count%2 == 0) {
+            //保存左声道的数据，一个采样值16位，两个字节
+            fwrite(buf, 1, 2, fp1);
+        
+            //保存右声道的数据，一个采样值16位，两个字节
+            fwrite(buf+2, 1, 2, fp1);
+        }
+        
+        count++;
+    }
+    
+    fclose(fp);
+    fclose(fp1);
+    
+    return 1;
+}
+
+
+
+int main()
+{
+    char file[] = "./mediadata/NocturneNo2inEflat_44.1k_s16le.pcm";
+    if (pcm16le_doublespeed(file)) {
+        printf("操作成功！！！\n");
+    } else {
+        printf("操作失败！！！\n");
+    }
+}
+
+```
+
+从源代码可以看出，本程序只采样了每个声道偶数点的样值。处理完成后，原本22秒左右的音频变成了11秒左右。音频的播放速度提高了2倍，音频的音调也变高了很多。
+
+
+<br />
+<br />
+
+
 参考：[视音频数据处理入门：RGB、YUV像素数据处理](http://blog.csdn.net/leixiaohua1020/article/details/50534150)
 ![](./images/leixiaohua_avDataProcess.png)
